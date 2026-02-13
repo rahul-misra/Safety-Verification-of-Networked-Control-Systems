@@ -8,7 +8,7 @@ close all
 clear 
 yalmip('clear')
 
-% Sinas IEEE 39 bus
+% IEEE 39 bus
 
 % % % % % % % % % % % % % % % % % % % % Data of  Area 1
 B1=0.3417;
@@ -125,7 +125,7 @@ F = A*x;
 
 % Reset Map
 R1 = [x(1:17); 0; x(15:17)]; % R1 = [x, e, 0, e]
-R2 = [x(1:14); x(15:17) - x(19:21); x(18); zeros(3,1)]; % R1 = [x, e - s, \tau, zeros(3,1)]
+R2 = [x(1:14); x(15:17) - x(19:21); x(18); zeros(3,1)]; % R2 = [x, e - s, \tau, zeros(3,1)]
 
 % Max time in seconds
 T_max = 1e-1;
@@ -182,6 +182,8 @@ U6 = -x(11) + 0.81;
 [h1,coefh1,monh1] = polynomial(x,D);
 [h2,coefh2,monh2] = polynomial(x,D);
 
+%%
+
 % h1(R1) and h2(R2)
 h1R1 = 0;
 for iter = 1:length(monh1)
@@ -194,6 +196,8 @@ for iter = 1:length(monh1)
     new_mono1 = replace(monh1(iter), x, R2);   % or any substitution
     h2R2 = h2R2 + coefh2(iter)*new_mono1;
 end
+
+%%
 
 % The infinitesmal generator consists of two components
 Lh1 = jacobian(h1,x)*F + lambda*(h1R1-h1);
@@ -221,7 +225,7 @@ constr = [constr; sos(h2-1 - s8*U2)];
 % Boundary condition: h(R1) <= h(R2)
 G1 = tau - T_max; % tau is the timer state
 G2 = -tau + T_max;
-constr = [constr; sos(+h2R2 - h1R1 - s9*G1 - s10*G2)];
+constr = [constr; sos(h2R2 - h1R1 - s9*G1 - s10*G2)];
 
 % p >= 0
 constr = [constr; p>=0; p<=1];
@@ -229,19 +233,19 @@ constr = [constr; p>=0; p<=1];
 % % h1(0) == 0 and h2(0) == 0
 % constr = [constr; coefh1(1) == 0; coefh2(1) == 0];
 
-% SOLUTION
+% Setting up SOS
 params = [coefs1;coefs2;coefs3;coefs4;coefs5;coefs6;coefs7;coefs8;coefh1;coefh2;p];
-params = [params; coefs9];
+params = [params;coefs9;coefs10];
 options = sdpsettings('solver','mosek');
+
+%% Solving SoS problem
 [sol, v, Q] = solvesos(constr,p,options,params);
 
-% FeasibilityConstraints = [constr, p <= 0.9999*value(p)];
-% [sol, v, Q] = solvesos(FeasibilityConstraints,[],options,params);
-% 
-% value(p)      
+%% Verifying the positivity of the solution
 min([eig(Q{1}),eig(Q{2}),eig(Q{3}),eig(Q{4}),eig(Q{5}),eig(Q{6}),eig(Q{7}),eig(Q{8})])
 min([eig(Q{9}),eig(Q{10}),eig(Q{11}),eig(Q{12}),eig(Q{13}),eig(Q{14}),eig(Q{15}),eig(Q{16})]) 
 
+%% Removing varaiables with low positive values
 Br1 = clean(replace(h1,coefh1,double(coefh1)),1e-8);
 sdisplay(Br1)
 
